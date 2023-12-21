@@ -14,5 +14,10 @@
   "[javascript]": {
     "editor.defaultFormatter": "denoland.vscode-deno"
   },
-  "editor.formatOnSave": true
+  "editor.formatOnSave": true,
+  "scss.format.enable": true,
+  "scss.format.preserveNewLines": false,
+  "[scss]": {
+    "editor.defaultFormatter": "vscode.css-language-features"
+  }
 }
