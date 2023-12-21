@@ -1,10 +1,10 @@
 import sass from "$sass/mod.ts";
 import { walk } from "$std/fs/walk.ts";
 import { dirname, join, relative } from "$std/path/mod.ts";
+import { assert } from "$std/assert/assert.ts";
 
 import type { Handlers, Plugin, ResolvedFreshConfig } from "$fresh/server.ts";
 import type { SassOptions } from "$sass/src/types/module.types.ts";
-import { assert } from "$std/assert/assert.ts";
 
 async function compileSassFile(
   file: string,
