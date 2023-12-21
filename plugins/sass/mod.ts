@@ -18,7 +18,7 @@ async function compileSassFile(
   assert(false, "Unexpected result from sass compiler");
 }
 
-async function writeAtomic(file: string, data: Uint8Array) {
+async function writeAtomic(file: string, data: Uint8Array): Promise<void> {
   await Deno.mkdir(dirname(file), { recursive: true });
   const tmp = `${file}.tmp`;
   await Deno.writeFile(tmp, data);
@@ -29,7 +29,7 @@ async function compileDir(
   root: string,
   outDir: string,
   options: SassOptions,
-) {
+): Promise<void> {
   const iter = walk(root, { exts: [".sass", ".scss"] });
   for await (const file of iter) {
     const outFile = join(outDir, relative(root, `${file.path}.css`));
