@@ -1,14 +1,8 @@
 import sass from "$sass/mod.ts";
+import { walk } from "$std/fs/walk.ts";
+import { dirname, join, relative } from "$std/path/mod.ts";
 
-import type {
-  Handlers,
-  Plugin,
-  PluginAsyncRenderContext,
-  PluginRenderContext,
-  PluginRenderResult,
-  ResolvedFreshConfig,
-} from "$fresh/server.ts";
-
+import type { Handlers, Plugin, ResolvedFreshConfig } from "$fresh/server.ts";
 import type { SassOptions } from "$sass/src/types/module.types.ts";
 
 export interface SassPluginConfig extends SassOptions {
@@ -19,16 +13,37 @@ const defaultConfig = {
   sassRoot: "styles",
 };
 
-export const compileSass = async (
-  src: string,
+async function compileSassFile(
+  file: string,
   options: SassOptions,
-): Promise<Uint8Array> => {
-  const scss = await Deno.readFile(src);
-  const res = sass(scss, options).to_buffer("expanded");
-  if (res instanceof Uint8Array) return res;
-  if (res === false) throw new Error(`Failed to compile ${src}`);
+): Promise<Uint8Array> {
+  // console.log(`sass compiling ${file}`);
+  const src = await Deno.readFile(file);
+  const css = sass(src, options).to_buffer();
+  if (css instanceof Uint8Array) return css;
+  if (css === false) throw new Error(`Failed to compile ${file}`);
   throw new Error(`Bang!`);
-};
+}
+
+async function writeAtomic(file: string, data: Uint8Array) {
+  await Deno.mkdir(dirname(file), { recursive: true });
+  const tmp = `${file}.tmp`;
+  await Deno.writeFile(tmp, data);
+  await Deno.rename(tmp, file);
+}
+
+async function compileDir(
+  root: string,
+  outDir: string,
+  options: SassOptions,
+) {
+  const iter = walk(root, { exts: [".sass", ".scss"] });
+  for await (const file of iter) {
+    const outFile = join(outDir, relative(root, `${file.path}.css`));
+    const css = await compileSassFile(file.path, options);
+    await writeAtomic(outFile, css);
+  }
+}
 
 const sassPlugin: (config?: SassPluginConfig) => Plugin = (config = {}) => {
   const { sassRoot, ...options } = { ...defaultConfig, ...config };
@@ -37,8 +52,7 @@ const sassPlugin: (config?: SassPluginConfig) => Plugin = (config = {}) => {
     async GET(req) {
       const path = sassRoot +
         new URL(req.url).pathname.replace(/\.css$/i, "");
-      console.log(`${req.url} -> ${path}`);
-      const css = await compileSass(path, options);
+      const css = await compileSassFile(path, options);
       return new Response(css, { headers: { "Content-Type": "text/css" } });
     },
   };
@@ -46,31 +60,13 @@ const sassPlugin: (config?: SassPluginConfig) => Plugin = (config = {}) => {
   return ({
     name: "sass-plugin",
 
-    render(ctx: PluginRenderContext): PluginRenderResult {
-      const res = ctx.render();
-      console.log(`render`, { ctx, res });
-      return res;
-    },
-
-    async renderAsync(
-      ctx: PluginAsyncRenderContext,
-    ): Promise<PluginRenderResult> {
-      const res = await ctx.renderAsync();
-      console.log(`renderAsync`, { ctx, res });
-      return res;
-    },
-
-    buildStart(config: ResolvedFreshConfig) {
-      console.log(`buildStart`, config);
-    },
-
-    buildEnd() {
-      console.log(`buildEnd`);
+    async buildStart(config: ResolvedFreshConfig) {
+      await compileDir(sassRoot, join(config.build.outDir, "static"), options);
     },
 
     routes: [
-      { path: "(.+).scss.css", handler },
       { path: "(.+).sass.css", handler },
+      { path: "(.+).scss.css", handler },
     ],
   });
 };
