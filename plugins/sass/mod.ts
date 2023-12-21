@@ -50,8 +50,8 @@ const sassPlugin: (config?: SassPluginConfig) => Plugin = (config = {}) => {
 
   const handler: Handlers = {
     async GET(req) {
-      const path = sassRoot +
-        new URL(req.url).pathname.replace(/\.css$/i, "");
+      const relPath = new URL(req.url).pathname.replace(/\.css$/, "");
+      const path = join(sassRoot, relPath);
       const css = await compileSassFile(path, options);
       return new Response(css, { headers: { "Content-Type": "text/css" } });
     },

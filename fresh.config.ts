@@ -2,4 +2,6 @@ import { defineConfig } from "$fresh/server.ts";
 
 import sassPlugin from "./plugins/sass/mod.ts";
 
-export default defineConfig({ plugins: [sassPlugin({ sassRoot: "styles" })] });
+export default defineConfig({
+  plugins: [sassPlugin({ sassRoot: "styles", load_paths: ["styles"] })],
+});
