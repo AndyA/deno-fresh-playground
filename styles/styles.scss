@@ -127,3 +127,10 @@ html {
 .tabular-nums {
   font-variant-numeric: tabular-nums;
 }
+
+.foo {
+  color:black;
+  .bar {
+    background-color: red;
+  }
+}
