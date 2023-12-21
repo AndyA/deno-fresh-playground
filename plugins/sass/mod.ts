@@ -4,14 +4,7 @@ import { dirname, join, relative } from "$std/path/mod.ts";
 
 import type { Handlers, Plugin, ResolvedFreshConfig } from "$fresh/server.ts";
 import type { SassOptions } from "$sass/src/types/module.types.ts";
-
-export interface SassPluginConfig extends SassOptions {
-  sassRoot?: string;
-}
-
-const defaultConfig = {
-  sassRoot: "styles",
-};
+import { assert } from "$std/assert/assert.ts";
 
 async function compileSassFile(
   file: string,
@@ -22,7 +15,7 @@ async function compileSassFile(
   const css = sass(src, options).to_buffer();
   if (css instanceof Uint8Array) return css;
   if (css === false) throw new Error(`Failed to compile ${file}`);
-  throw new Error(`Bang!`);
+  assert(false, "Unexpected result from sass compiler");
 }
 
 async function writeAtomic(file: string, data: Uint8Array) {
@@ -45,13 +38,31 @@ async function compileDir(
   }
 }
 
-const sassPlugin: (config?: SassPluginConfig) => Plugin = (config = {}) => {
-  const { sassRoot, ...options } = { ...defaultConfig, ...config };
+export interface SassPluginConfig extends SassOptions {
+  root?: string;
+  loadPaths?: string[];
+}
+
+const defaultConfig = {
+  root: "styles",
+};
+
+export default function sassPlugin(
+  config?: Readonly<SassPluginConfig>,
+): Plugin {
+  const { root, loadPaths, ...options } = { ...defaultConfig, ...config };
+
+  // Update the options to include our root path and allow loadPaths as an
+  // alias for load_paths. This is safe from the caller's PoV because we've
+  // shallow-cloned options from config.
+  options.load_paths = [root]
+    .concat(options.load_paths ?? [])
+    .concat(loadPaths ?? []);
 
   const handler: Handlers = {
     async GET(req) {
       const relPath = new URL(req.url).pathname.replace(/\.css$/, "");
-      const path = join(sassRoot, relPath);
+      const path = join(root, relPath);
       const css = await compileSassFile(path, options);
       return new Response(css, { headers: { "Content-Type": "text/css" } });
     },
@@ -61,7 +72,7 @@ const sassPlugin: (config?: SassPluginConfig) => Plugin = (config = {}) => {
     name: "sass-plugin",
 
     async buildStart(config: ResolvedFreshConfig) {
-      await compileDir(sassRoot, join(config.build.outDir, "static"), options);
+      await compileDir(root, join(config.build.outDir, "static"), options);
     },
 
     routes: [
@@ -69,6 +80,4 @@ const sassPlugin: (config?: SassPluginConfig) => Plugin = (config = {}) => {
       { path: "(.+).scss.css", handler },
     ],
   });
-};
-
-export default sassPlugin;
+}
